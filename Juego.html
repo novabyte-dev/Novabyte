@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NovaByte: Cyber Defender</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .header-title {
+      margin-bottom: 15px;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    .header-title span {
+      color: #38bdf8;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    canvas {
+      background-color: #1e293b;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+    }
+
+    .controls-hint {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-title">
+    <i class="fa-solid fa-shield-halved" style="color: #38bdf8;"></i> Nova<span>Byte</span> Cyber Defender
+  </div>
+
+  <div id="game-container">
+    <canvas id="gameCanvas" width="400" height="580"></canvas>
+  </div>
+
+  <p class="controls-hint">Usa las flechas ◄ ► o arrastra en pantalla para mover el NovaShield.</p>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // ESTADO DEL JUEGO
+    let score = 0;
+    let lives = 3;
+    let level = 1;
+    let gameOver = false;
+    let items = [];
+    let spawnTimer = 0;
+
+    // JUGADOR (NOVASHIELD)
+    const player = {
+      x: canvas.width / 2 - 45,
+      y: canvas.height - 35,
+      width: 90,
+      height: 16,
+      speed: 8,
+      dx: 0
+    };
+
+    // TECLADO
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft" || e.key === "a") player.dx = -player.speed;
+      if (e.key === "ArrowRight" || e.key === "d") player.dx = player.speed;
+      if (gameOver && e.key === " ") restartGame();
+    });
+
+    document.addEventListener("keyup", (e) => {
+      if (["ArrowLeft", "ArrowRight", "a", "d"].includes(e.key)) player.dx = 0;
+    });
+
+    // CONTROL TÁCTIL / RATÓN
+    function movePointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const x = clientX - rect.left;
+      player.x = x - player.width / 2;
+
+      if (gameOver) restartGame();
+    }
+
+    canvas.addEventListener("mousemove", movePointer);
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      movePointer(e);
+    }, { passive: false });
+
+    canvas.addEventListener("click", () => {
+      if (gameOver) restartGame();
+    });
+
+    // GENERAR ELEMENTOS (BYTES Y MALWARE)
+    function spawnItem() {
+      const isBug = Math.random() < 0.35; // 35% probabilidad de virus
+      items.push({
+        x: Math.random() * (canvas.width - 30) + 15,
+        y: -20,
+        size: 22,
+        speed: 2.5 + Math.random() * 2 + (score * 0.05),
+        isBug: isBug
+      });
+    }
+
+    // BUCLE DE ACTUALIZACIÓN
+    function update() {
+      if (gameOver) return;
+
+      // Mover jugador
+      player.x += player.dx;
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+      // Frecuencia de aparición
+      spawnTimer++;
+      if (spawnTimer > Math.max(20, 45 - level * 2)) {
+        spawnItem();
+        spawnTimer = 0;
+      }
+
+      // Nivel de dificultad
+      level = Math.floor(score / 100) + 1;
+
+      // Actualizar ítems
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        item.y += item.speed;
+
+        // Colisión con la plataforma NovaShield
+        if (
+          item.y + item.size / 2 >= player.y &&
+          item.y - item.size / 2 <= player.y + player.height &&
+          item.x + item.size / 2 >= player.x &&
+          item.x - item.size / 2 <= player.x + player.width
+        ) {
+          if (item.isBug) {
+            lives--;
+            if (lives <= 0) gameOver = true;
+          } else {
+            score += 10;
+          }
+          items.splice(i, 1);
+          continue;
+        }
+
+        // Eliminar si sale de la pantalla
+        if (item.y - item.size > canvas.height) {
+          items.splice(i, 1);
+        }
+      }
+    }
+
+    // DIBUJAR EN PANTALLA
+    function draw() {
+      // Fondo
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Rejilla de servidor
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+
+      // Dibujar Jugador (NovaShield)
+      ctx.fillStyle = "#38bdf8";
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#38bdf8";
+      ctx.beginPath();
+      ctx.roundRect(player.x, player.y, player.width, player.height, 8);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Dibujar Objetos
+      items.forEach(item => {
+        if (item.isBug) {
+          // Malware / Virus (Rojo)
+          ctx.fillStyle = "#ef4444";
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = "#ef4444";
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, item.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Detalle virus
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 10px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("X", item.x, item.y + 3);
+        } else {
+          // Data Byte (Cian)
+          ctx.fillStyle = "#38bdf8";
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = "#38bdf8";
+          ctx.fillRect(item.x - item.size / 2, item.y - item.size / 2, item.size, item.size);
+
+          // Texto 01
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "bold 10px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("01", item.x, item.y + 3);
+        }
+        ctx.shadowBlur = 0;
+      });
+
+      // HUD (Marcador)
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 16px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(`Bytes: ${score}`, 15, 30);
+
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#ef4444";
+      ctx.fillText(`Vidas: ${"♥ ".repeat(lives)}`, canvas.width - 15, 30);
+
+      // Pantalla de Game Over
+      if (gameOver) {
+        ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "#ef4444";
+        ctx.font = "bold 30px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("SISTEMA COMPROMETIDO", canvas.width / 2, canvas.height / 2 - 30);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "16px sans-serif";
+        ctx.fillText(`Bytes Rescatados: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "14px sans-serif";
+        ctx.fillText("Toca o presiona ESPACIO para reiniciar", canvas.width / 2, canvas.height / 2 + 50);
+      }
+    }
+
+    // BUCLE PRINCIPAL
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // REINICIAR JUEGO
+    function restartGame() {
+      items = [];
+      score = 0;
+      lives = 3;
+      level = 1;
+      gameOver = false;
+      player.x = canvas.width / 2 - player.width / 2;
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
